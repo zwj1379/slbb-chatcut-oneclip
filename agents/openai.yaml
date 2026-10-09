@@ -1,4 +1,4 @@
 interface:
-  display_name: "口播一键剪辑（单条）"
-  short_description: "一键把一条 9:16 竖屏口播剪成成片：删废话、1.1x 提速、B-Roll、单行黑底白字字幕、铺背景音频、导出 1080P。只剪单条，不接批量"
-  default_prompt: "帮我剪这条口播视频：删掉废话和停顿，1.1 倍速，按文案加 B-Roll，配单行黑底白字字幕，铺背景音频，导出 1080P 竖屏。只剪这一条。"
+  display_name: "口播剪辑（单条优化版）"
+  short_description: "用 ChatCut 客户端剪单条口播，字幕准确显眼且严格单行，确认预览后导出"
+  default_prompt: "使用 $slbb-chatcut-oneclip，根据我的主口播、对应文案和辅助素材剪辑一条竖屏视频；字幕准确显眼、严格单行且不越安全区，剪完先给我预览，确认后再导出。"

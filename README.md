@@ -1,112 +1,23 @@
-# slbb-chatcut-oneclip
+# 单条口播剪辑优化版 · v2.0.0
 
-> One-click editing for a single 9:16 vertical talking-head video.
-> 一键剪辑单条 9:16 竖屏口播短视频。
+把本文件夹作为 `slbb-chatcut-oneclip` Skill 导入 WorkBuddy。它由 WorkBuddy 运行，通过已连接的 MCP 操作 ChatCut 客户端，剪完等待预览确认，再正式导出。没有独立剪辑程序，也不会安装 ChatCut 或更改连接配置。
 
-## What it does / 它能做什么
+## 安装与调用
 
-Drop in one talking-head clip, and it auto-edits to a publish-ready 9:16 short with a fixed recipe:
+若当前 WorkBuddy 版本提供 Skill 导入功能，可选择 ZIP 或解压后的文件夹；该界面的具体操作需以本机版本为准。若本机采用个人技能目录，将完整 `slbb-chatcut-oneclip/` 文件夹放到 `~/.workbuddy/skills/`；已有同名版本先保存独立备份，再替换，不同时保留两个同名活跃入口。新开会话确认能发现它。是否需要重启由当前 WorkBuddy 版本决定。
 
-- Trim pauses / filler / mistakes / dead air; **cut the opening silence so the first frame already speaks**
-- Speed up the whole timeline at 1.1×
-- Cover with full-screen B-Roll + a real-person PiP in the top-right corner (landscape sources fit via `cover`)
-- Single-line black-on-white Simplified Chinese subtitles (overflow → split by semantics, never wrap)
-- Lay a BGM bed (BGM + opening SFX baked into a single track) with duck `-6 dB` and gain `+6 dB` — **your own upload wins; if you don't upload one, the bundled `assets/bgm.mp3` is used automatically**
-- Export 1080P H.264 to your Desktop
+本次交付只生成文件和 ZIP，未安装到个人目录，未覆盖旧版。创建 Skill 也不会自动注册 ChatCut MCP；原有客户端和本地连接必须可用。运行时用真实项目查询核验，不把配置条目当作连接成功。
 
-中文流程同上：删废话停顿、1.1× 提速、全屏 B-Roll + 真人画中画、单行黑底白字字幕、铺背景音频（**自己上传的优先，没上传就自动用内置 `assets/bgm.mp3`，不用你再找素材**）、1080P H.264 导出。
+在 WorkBuddy 中选中这个 Skill，提供一条主口播、对应文案、可选 B-Roll 和音乐，例如：
 
-## Mode / 模式
+> 使用 slbb-chatcut-oneclip，按这条实际口播和对应文案剪辑。辅助素材用于 B-Roll。字幕准确显眼、严格单行且在安全区内；剪完给我预览，确认后再导出。
 
-**Single / 单条** — feed one video → one project → one finished file. 一次只剪一条，剪完即出片。
+主视频与文案冲突时以真实语音为准。用户没有音乐时使用内置音轨；素材足够便按时长规则选择 B-Roll。需要已授权的本地文件读取、任务目录写入与工程操作权限；缺权限就报告，不规避。
 
-> Feed more than one video, or a folder → this skill does **not** handle it. Use the batch version `slbb-chatcut-oneshot` instead.
-> 给多条视频或一个文件夹 → 本技能不处理，请改用批量版 `slbb-chatcut-oneshot`。
+## 此版变化
 
-B-Roll picking rule / B-Roll 数量挑选：
+不固定字幕外观或去标点，优先原生模板和分卡；相关修改集中执行、关键阶段读回；区分本地可读与云上传；音乐按实际声音调节；同根因只修一次；正式导出前有预览确认及版本门。默认输出仍为 1080×1920、30fps、H.264。
 
-| 成片时长 | B-Roll 数量 |
-|---|---|
-| ≤ 15 秒 | 1 |
-| 15 ~ 40 秒 | 2 |
-| > 40 秒 | 3（封顶） |
+辅助脚本均为 Python 3 标准库；导出校验依赖 FFmpeg/ffprobe。`chatcut_mcp.py` 只用于已经配置、已允许的本地 stdio 连接，普通情况优先用宿主注册工具。脚本与参考按 SKILL.md 中的阶段调用。
 
-## Install first / 先装环境
-
-This skill drives ChatCut, so ChatCut must be installed. **You don't have to hunt for it yourself** — the bundled installer checks your machine, pops up a window asking you to sign in and download, then finishes the installation for you.
-
-本技能靠 ChatCut 干活，所以得先有 ChatCut。**不用自己找安装包** —— 附带的预检脚本会检查你的电脑，弹窗让你登录下载，然后自动把安装做完。
-
-| Platform / 平台 | Double-click this / 双击这个文件 |
-|---|---|
-| macOS | `scripts/install-macos.command` |
-| Windows | `scripts/install-windows.cmd` |
-
-Or from a terminal / 或者命令行：
-
-```sh
-python3 scripts/ensure-chatcut.py
-```
-
-What it does / 它会做什么：
-
-1. Detect whether ChatCut is installed — 检测客户端是否已安装
-2. If not, pop a native window → you sign in at `chatcut.io` → avatar → **Desktop App** → **Download** — 没装就弹窗，你登录后点头像菜单里的 Download
-3. Watch your Downloads folder and auto-install the moment it lands (mount → copy → clear quarantine → launch) — 盯住下载目录，一落地就自动挂载、安装、去隔离、启动
-4. Check and repair the WorkBuddy MCP connection in `~/.workbuddy/mcp.json` — 检查并补齐 WorkBuddy 的 MCP 连接
-5. Print a ✅/❌ report — 打印体检报告
-
-> **Why the manual click?** The installer lives behind a login wall (avatar menu), and there is no public direct download URL. The download itself needs a human; everything after it is automatic.
-> **为什么还要人点一下？** 安装包藏在登录后的头像菜单里，官方没有公开直链。下载这一下必须人来，下载之后全自动。
-
-After installation, **restart WorkBuddy or start a new conversation** so the new MCP tools load. 装完后**重启 WorkBuddy 或新开会话**，新工具才会加载。
-
-## How to use / 怎么用
-
-1. Make sure ChatCut Desktop is installed and running (see above — the installer handles it)
-2. Drop your video into ChatCut
-3. Invoke this skill — the prompt seed is in `agents/openai.yaml`, the full rules in `SKILL.md`
-4. The finished file lands on your Desktop; ffprobe verifies codec / resolution / duration after export
-
-## File structure / 文件结构
-
-| 文件 | 用途 |
-|---|---|
-| `SKILL.md` | 主入口：环境预检、素材确认、共享固定参数、B-Roll 数量挑选、单条流程、字幕硬规则 |
-| `scripts/ensure-chatcut.py` | 环境预检 / 自动安装（macOS + Windows，弹窗引导 + 自动装 + 补 MCP 连接） |
-| `scripts/install-macos.command` | macOS 双击启动器 |
-| `scripts/install-windows.cmd` | Windows 双击启动器 |
-| `assets/bgm.mp3` | 内置默认背景音乐（45.6 秒 / 1.0MB，开头已含开场音效）。用户没上传背景音频时自动使用；`.gitignore` 里有 `!assets/**` 例外专门放行它 |
-| `agents/openai.yaml` | OpenAI Agents 协议声明（`display_name` / `default_prompt`） |
-| `references/technical-guardrails.md` | 执行层技术护栏：转写、改速、B-Roll / 画中画、字幕、音频、像素验证、导出 |
-| `references/install-chatcut.md` | ChatCut 安装事实来源：官方入口、MCP 注册、OAuth 兜底流程、常见坑 |
-
-## Prerequisites / 前置依赖
-
-- **ChatCut Desktop** installed and running with the window open — run `scripts/ensure-chatcut.py` (or the double-click launcher for your platform) and it will handle the whole install
-- WorkBuddy's ChatCut MCP connection registered in `~/.workbuddy/mcp.json` — **the filename has no leading dot**
-- ChatCut official skills loaded per stage: `chatcut:transcription`, `chatcut:talking-head-guide`, `chatcut:visual-analysis`, optionally `chatcut:music`
-- **FFmpeg / ffprobe** for post-export validation only (not used to render)
-- **Python 3** for the installer script (also required by ChatCut's own WorkBuddy setup flow)
-
-## Things you should NOT change without re-validating / 不要乱改这些固定值
-
-这些值是反复踩坑才定下来的"够用值"。改了不验证整套管线很容易翻车。
-
-| 参数 | 固定值 | 踩过的坑 |
-|---|---|---|
-| 画幅 / fps | 9:16 / 1080×1920 / 30fps | 改了字幕框 / 画中画位置 / B-Roll 适配全要重算 |
-| 改速 | 1.1× | 太快会变声，太慢省不下来 |
-| 字幕同时存在 | 屏幕上一行 | 一屏两行会被字幕框压扁 |
-| 字幕超屏处理 | 不断行，按语义断句 | 换行会丢语义边界 |
-| 画中画 | 右上角 360×640 静音 | 挡字幕 / 手势 / 表情 |
-| BGM `duckDepthDb` | `-6`（**必须显式传**） | 不传会被自动 duck 到约 `-13 dB`，BGM 全程听不见 |
-| BGM `decibelAdjustment` | `+6` | 之前 `+3` 还不够响 |
-| 导出 | 1080P / H.264 / 30fps | 其他格式 / 编码容易出兼容问题 |
-
-## See also / 延伸阅读
-
-- [`SKILL.md`](./SKILL.md) — full rules, fixed parameters, the single-clip flow
-- [`agents/openai.yaml`](./agents/openai.yaml) — agent manifest
-- [`references/technical-guardrails.md`](./references/technical-guardrails.md) — AI executor guardrails
-- `slbb-chatcut-oneshot` — the batch-capable sibling (single + batch auto-detect)
+当前状态：已制作优化包；真实素材、当前 MCP 接口、字幕安全区像素和端到端速度需后续试剪验证。不承诺已提速、不自动开始客户端/网页端对比。详细验证结果见 ZIP 外附的交付验证记录。
