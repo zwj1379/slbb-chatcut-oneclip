@@ -22,6 +22,7 @@ python3 <Skill目录>/scripts/chatcut_mcp.py batch --calls-file <任务目录>/p
 
 - 优先工具支持的相关修改合并提交；`validateOnly` 仅在当前 schema 有该字段且对这次操作有价值时使用。
 - 不并发修改同一工程。依赖工具返回的新 ID 或新 revision 必须顺序执行。
+- 任何字幕、转写或脚本读写的**第一次调用前**，先用 `get_active_project` 确认当前活动工程就是本任务工程。桌面端用户可随时切走工程；在错误工程上操作会得到 `The active Timeline has no caption model` 一类假故障，据此“修复”会误伤无关项目。发现被切走就用 `target_project` 切回，再继续本阶段。
 - 四类阶段结果集中检查：主轨清理与提速、视觉编排、字幕、音频/总检。期间遇到越界、异步未终态或不确定写入回执仍立即读回。
 - 检查 MCP JSON-RPC error、`isError`、业务 `success:false` 及明确的错误正文；进程返回码 0 不代表编辑成功。错误文本可能嵌在 `content[].text` 中，不能只依赖异常捕获。
 - 异步 `pending/running` 不是失败；按工具建议间隔追踪同一作业，不重复启动。遇到明确失败进入一次修复流程。
