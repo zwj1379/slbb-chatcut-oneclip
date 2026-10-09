@@ -1,4 +1,4 @@
 interface:
   display_name: "口播剪辑（单条优化版）"
-  short_description: "用 ChatCut 客户端剪单条口播，字幕准确显眼且严格单行，确认预览后导出"
-  default_prompt: "使用 $slbb-chatcut-oneclip，根据我的主口播、对应文案和辅助素材剪辑一条竖屏视频；字幕准确显眼、严格单行且不越安全区，剪完先给我预览，确认后再导出。"
+  short_description: "用 ChatCut 客户端剪单条口播，字幕准确显眼、最多两行，确认预览后导出"
+  default_prompt: "使用 $slbb-chatcut-oneclip，根据我的主口播、对应文案和辅助素材剪辑一条竖屏视频；字幕准确显眼、最多两行且整卡不越安全区，剪完先给我预览，确认后再导出。"
