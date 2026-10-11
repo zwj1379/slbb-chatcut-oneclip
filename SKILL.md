@@ -2,7 +2,7 @@
 name: slbb-chatcut-oneclip
 description: 使用 WorkBuddy 或当前宿主通过本地 MCP 控制 ChatCut 客户端，剪辑一条 9:16 口播视频。适用于单条口播清理、B-Roll 与同步真人画中画、准确显眼、每卡最多两行的字幕、背景音乐和预览后导出。相关修改集中提交、关键阶段验证；剪完必须等待用户确认预览，才能导出正式成片。不用于多条主视频批量剪辑、网页端对比、素材生成或自动安装软件。
 metadata:
-  version: "2.3.0"
+  version: "2.5.0"
 ---
 
 # 单条口播剪辑 · 优化流程
@@ -24,7 +24,7 @@ metadata:
 | 项目 | 要求 |
 | --- | --- |
 | 主口播 | 自动去明显口误、重复、卡壳、首尾空白，收紧过长停顿；可删不影响意思的啰嗦内容，但必须保留原意、关键事实、论据及叙事顺序 |
-| 语速 | 默认 1.1 倍；实际听感不自然时恢复原速并说明，不额外追问常规参数 |
+| 语速 | 默认 1.1 倍；**设完 playbackRate 后必须读 timeline 校验相邻 item 源范围无重叠**（详见第 2 节），总源需求超出素材时长时多删水词或降回原速；实际听感不自然时恢复原速并说明，不额外追问常规参数 |
 | 输出默认 | 9:16，1080×1920，30fps，H.264 MP4；不额外生成 720P 副本 |
 | B-Roll | 按清理和提速后的主口播时长：≤15 秒选 1 个；>15 至 40 秒选 2 个；>40 秒最多 3 个。只选相关且可用的素材，不足时少用，没有则保持真人镜头 |
 | 画中画 | B-Roll 全屏覆盖期间，右上角同步真人小窗，默认 360×640、left=684、top=120；真人副本和 B-Roll 静音，主口播保留声音 |
@@ -58,6 +58,8 @@ metadata:
 
 **倍速碎片清理注意**：1.1x 倍速后会产生很多碎片行（单字、短停顿），清理时要逐行确认，不要误删有效内容。特别是句子中间的片段，删之前先确认是不是上一句的后半段。如果误删了，可以通过“先删旧行 → 加 bare [sN] → 删开头多余词”的方式恢复。
 
+**playbackRate 后必须校验源范围无重叠（2026-10 实测教训）**：ChatCut 的 playbackRate 语义是"时间线占位不变、读源更快、sourceOut 自动扩大 1.1 倍"，不是"总时长缩短 10%"。批量设完 playbackRate 后，必须读一遍 timeline，逐段检查相邻 item 的 `sourceOut ≤ 下一个 sourceIn`。如果总源需求（时间线总帧数 ÷ 30 × playbackRate）超过素材时长，ChatCut 会靠相邻 item 源范围重叠来"借"内容，接缝处音频会重复（用户能明显听到"带大家看带大家看"这种叠字）。发现重叠时，手动把每个 item 的 sourceIn 对齐到前一个 item 的 sourceOut，不要靠换 playbackRate 重试。1.1x 后若总源需求超出素材，优先选择：①多删 2-3 秒水词/停顿；②降到 1.0x 原速并告知用户；禁止在重叠状态下直接交付。
+
 ## 3. B-Roll 与同步画中画
 
 选择语义最相关的素材，用必要的代表帧判读，避免每个素材全片分析。仅在选中覆盖段上放置全屏 B-Roll 与真人小窗；其余时段保留真人主镜头。默认开头保留真人。
@@ -68,9 +70,17 @@ metadata:
 
 集中创建视觉轨道和相关片段；跨主轨剪切点时按主轨边界拆分真人副本，源起点、倍率、起止帧逐段匹配。普通批量提交与修改依赖有先后关系的操作要区分，不并发抢写同一时间线。阶段完成读回一次结构，切入/跨切点/退出的代表帧留到总检。
 
+**V1 item 参数变化后必须同步 V3 小窗副本（2026-10 实测教训）**：V3 轨真人小窗是 `fromItemId` 复制 V1 主口播 item 的副本。V1 轨任何 item 的 `sourceIn`、`sourceOut`、`playbackRate`、时间位置变化后，V3 轨对应副本不会自动跟随更新，会导致小窗里的人嘴型跟主口播声音错位（用户能直接感到"音画不同步"）。每次调整 V1 主轨后，必须把 V3 轨对应 item 的 sourceIn、playbackRate 逐段对齐到 V1。同理 V2（B-roll 素材）的 audioVolume 必须为 0，V3 副本 audioVolume 也必须为 0，确保全片人声唯一来源是 V1 主口播。
+
 ## 4. 字幕
 
 此阶段读 [caption-quality.md](references/caption-quality.md)。显式限定主口播轨为唯一字幕源，避免 B-Roll 或真人副本产生重复字幕。
+
+**enable 后立刻隐藏非主轨字幕（2026-10 实测教训）**：`edit_captions enable` 会给所有视频轨（V1 主口播、V2 B-Roll 素材、V3 小窗副本）都自动生成字幕。V2 是现场杂音转写（"对我们就给了大大家一个定位"之类），V3 跟 V1 内容重复。enable 后第一件事必须是：把 V2、V3 轨 `visible:false`，只保留 V1。
+
+**用户要的"字幕只出现在 A-roll"= 字幕源是 A-roll 音频，不是"B-roll 全屏期间隐藏主口播字幕"**：B-roll 全屏画面期间主口播还在说话，字幕必须正常显示主口播内容。不要为了"B-roll 干净"去隐藏 V1 卡或清空卡文字——这是误读用户意图。
+
+**禁止用 `set_card_text text:""` 或 `" "` 删字（2026-10 实测教训）**：把卡文字设空串会同时清空卡的 words token 绑定，之后再填回原文会报 "Caption text could not be mapped to its source tokens"，卡变成无法恢复的"孤儿卡"。但 `set_card_text` 改成**非空的正确文本**（如把"walk WorkBuddy"改成"WorkBuddy"）是安全的，是专名/水词修正的推荐路径。不要混淆"清空"和"改写"。
 
 优先原生字幕分页/分卡与模板；将专名修正和语义断句规划集中处理。先完成准确性与分卡，再套一次合适模板，最后做安全区布局。完整保留口播文字和时间关系；模板改变分卡时必须重新检查。
 
@@ -78,7 +88,12 @@ metadata:
 
 **edit_captions 无 delete action**：不能删除旧字幕卡并重新生成，只能手动改文本和位置。如果字幕卡乱了，只能逐卡修正，不能整体重来。
 
-**ASR 修正**：专名、同音词错误用 `manage_transcript fix` 修正，命令格式是 `FIX sN: wordIdx -> "newText"`（注意箭头两边要有空格）。如果命令格式试不对，就直接用 `edit_captions set_card_text` 手动改字幕文本。
+**ASR 修正（专名/同音词/水词）——优先 set_card_text 改显示，不要先动源（2026-10 实测教训）**：
+- `manage_transcript fix` 的 wordIdx 是**字级索引**（不是词级），盲猜极易偏一位，连续 fix 两次还会把源转写改乱（如把"从"改成 Codex、把"body"改成 WorkBuddy，但"扣带式""walk"残留）。
+- 更关键：**fix 改了源转写后，apply_script 会立刻报"Script row changes spoken words"**，因为 timeline.md 跟源不一致，必须重新 refreshCache + 重写 timeline + 重新 apply，一步错步步错。
+- **推荐路径**：先按源转写原样写 timeline.md 并 apply_script，让 item 先上时间线；字幕 enable 后再用 `set_card_text` 逐卡改显示文本（专名、水词、口癖）。set_card_text 只改 viewer-facing text，不动 words token 绑定，安全且不会触发 apply 校验。
+- 只有当 ASR 错误严重到影响 item 切分边界时，才用 `manage_transcript fix`，且必须先 refreshCache、读完 library/*.md 确认 wordIdx、fix 后立刻重写 timeline.md 再 apply。
+- 命令格式：`FIX sN: wordIdx -> "newText"`（箭头两边要有空格）。改完必须读回 library/*.md 确认 wordIdx 没偏。
 
 不要为黑底、圆角、某种颜色或去标点反复调参。**禁止对字幕 item 写 `maxLines`（设 1 或设 2 都禁止），也不要借一次批量样式重写顺手分卡**：实测会清空全部字幕卡并连带删除素材转写，只能靠重转写恢复。行数由卡片宽度自然折行决定，`split_card` 只在真实 token 边界按语义重分卡，不是行数控制器，也不能靠裁字、极小字号或删掉后半句制造。单行优先，每卡最多两行；两行仍放不下时，遵守一次修复预算并暂停报告，不压缩成不可读的小字。细节见 [caption-quality.md](references/caption-quality.md#破坏性操作禁令)。
 

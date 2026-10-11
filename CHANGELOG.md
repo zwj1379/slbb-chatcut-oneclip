@@ -4,6 +4,29 @@
 
 ---
 
+## v2.5.0 (2026-10-11)
+
+第二轮实战（济南国庆沙龙 A-Roll）踩坑回填，全部是执行侧硬约束。
+
+**新增注意事项：**
+
+- **`playbackRate` 的语义不是「总时长缩短 10%」**：ChatCut 的实际行为是「时间线占位不变、读源更快、`sourceOut` 自动扩大 1.1 倍」。批量设完倍速后必须读 timeline，逐段校验相邻 item `sourceOut ≤ 下一个 sourceIn`；当总源需求（时间线总帧数 ÷ 30 × 倍速）超出素材时长时，ChatCut 会靠相邻 item 源范围重叠来「借」内容，接缝处音频叠字（实测听到「带大家看带大家看」）。发现重叠就把每个 item 的 `sourceIn` 对齐到前一个 item 的 `sourceOut`，不要靠改倍速重试；仍超出时优先多删 2–3 秒水词，或降回 1.0x 并告知用户
+- **V1 参数变化后必须同步 V3 小窗副本**：V3 轨真人小窗是 `fromItemId` 复制 V1 主口播 item 的副本，V1 的 `sourceIn` / `sourceOut` / `playbackRate` / 时间位置变化后 V3 不会自动跟随，会出现小窗嘴型与主口播声音错位。每次调完 V1 都要把 V3 对应段的 `sourceIn`、`playbackRate` 逐段对齐；同时 V2、V3 的 `audioVolume` 必须为 0，保证全片人声唯一来源是 V1
+- **`edit_captions enable` 后立刻隐藏非主轨字幕**：enable 会同时给 V1 / V2 / V3 三条视频轨生成字幕，V2 是现场杂音转写、V3 与 V1 重复。enable 后第一件事就是把 V2、V3 轨设 `visible:false`，只留 V1
+- **「字幕只出现在 A-roll」的正确理解**：指字幕源取 A-roll 音频，**不是**「B-roll 全屏期间隐藏主口播字幕」。B-roll 覆盖时主口播仍在说话，字幕必须正常显示主口播内容；不要为了「B-roll 干净」去隐藏 V1 卡或清空卡文字
+- **禁止用 `set_card_text text:""` 或 `" "` 删字**：置空会同时清空卡片的 words token 绑定，之后填回原文会报 `Caption text could not be mapped to its source tokens`，卡片变成无法恢复的「孤儿卡」。但把 `set_card_text` 改成**非空**的正确文本（如 `walk WorkBuddy` → `WorkBuddy`）是安全的，这是专名 / 水词修正的推荐路径——不要混淆「清空」与「改写」
+- **ASR 修正改为「优先改显示、不要先动源」**：`manage_transcript fix` 的 `wordIdx` 是**字级索引**而非词级，盲猜极易偏一位，连续 fix 还会把源转写改乱；更关键的是 fix 改了源转写后 `apply_script` 会立刻报 `Script row changes spoken words`，必须 refreshCache → 重写 timeline.md → 重新 apply，一步错步步错。推荐路径：先按源转写原样写 timeline 并 apply，字幕 enable 后用 `set_card_text` 逐卡改显示文本（专名 / 水词 / 口癖）；只有 ASR 错误严重到影响 item 切分边界时才用 `fix`，且必须先 refreshCache、读回 `library/*.md` 确认 wordIdx
+
+**合并说明：**
+
+- 本版由作者侧 2.5.0 分发包与仓库 v2.3.0 合并而成。分发包从 v2.2.0 附近的旧基线分叉，带回了两处仓库已修的问题，合并时按仓库版本保留修正：
+  - `SKILL.md` 5 处中文开引号（分发包误写成右引号）
+  - 字幕布局示例坐标（分发包写 `left=90, top=1468, width=900`，外框 x=90…990 越出自定安全区 x=108…972；保留仓库的 `left=108, top=1436, width=864, height=100`）
+- 分发包内 `CHANGELOG.md` / `README.md` / `使用说明.md` 的版本信息滞后（停在 v2.2.0–v2.3.0），本次以仓库版本为基座补齐
+- `references/`、`scripts/`、`agents/`、`assets/` 两份完全一致，未做改动
+
+---
+
 ## v2.3.0 (2026-10-10)
 
 **新增实战注意事项（来自实际剪辑踩坑）：**
