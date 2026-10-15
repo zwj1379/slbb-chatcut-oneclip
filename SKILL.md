@@ -2,7 +2,7 @@
 name: slbb-chatcut-oneclip
 description: 使用 WorkBuddy 或当前宿主通过本地 MCP 控制 ChatCut 客户端，剪辑一条 9:16 口播视频。适用于单条口播清理、B-Roll 与同步真人画中画、准确显眼、每卡最多两行的字幕、背景音乐和预览后导出。相关修改集中提交、关键阶段验证；剪完必须等待用户确认预览，才能导出正式成片。不用于多条主视频批量剪辑、网页端对比、素材生成或自动安装软件。
 metadata:
-  version: "2.5.1"
+  version: "2.6.0"
 ---
 
 # 单条口播剪辑 · 优化流程
@@ -83,7 +83,11 @@ metadata:
 
 **禁止用 `set_card_text text:""` 或 `" "` 删字（2026-10 实测教训）**：把卡文字设空串会同时清空卡的 words token 绑定，之后再填回原文会报 "Caption text could not be mapped to its source tokens"，卡变成无法恢复的"孤儿卡"。但 `set_card_text` 改成**非空的正确文本**（如把"walk WorkBuddy"改成"WorkBuddy"）是安全的，是专名/水词修正的推荐路径。不要混淆“清空”和“改写”。
 
-**平台规避词只做字幕留白，不改台词（2026-10-15 用户更新）**：对 Codex、WorkBuddy、豆包等用户指定或高置信的品牌/同行产品专名，保留原始口播、源转写、主轨剪辑和其余字幕文字。使用真实 token 边界把目标词从原字幕卡中单独分成一张卡，再删除这张目标词卡，使对应时间段画面无字。不要改写成“某 AI 工具”等替代说法，也不要删除音频、静音、变调或收紧这段时间。多个连续 token 组成一个专名时整体隔离，前后卡保持原文与原时序。
+**平台规避词只做字幕留白，不改台词（2026-10-15 用户更新）**：对 Codex、WorkBuddy、豆包等用户指定或高置信的品牌/同行产品专名，保留原始口播、源转写、主轨剪辑和其余字幕文字。使用真实 token 边界把目标词从原字幕卡中单独分成一张卡，再把这张目标词卡移出画面（见下方「留白实现」），使对应时间段画面无字。不要改写成“某 AI 工具”等替代说法，也不要删除音频、静音、变调或收紧这段时间。多个连续 token 组成一个专名时整体隔离，前后卡保持原文与原时序。
+
+**规避词被 ASR 识别成同音错词（2026-10-15 第三轮实测）**：口播实际说的品牌专名可能被 ASR 识别成另一个词形（实测：口播 Codex 被识别成「口袋词/口袋子」）。此时不要按错误词形去“改对显示文本”，也不要按用户纠错后的正确词在字幕里搜索——目标词以错误词形的 token 段存在于卡中，先向用户确认原词与时段，再用 `read_captions words=true` 找到该错误词形词段（即使文本是错词），按它的真实 token 边界隔离并留白。
+
+**留白实现：`set_card_layout` 移出画布（2026-10-15 第三轮实测，替代“请用户删除”）**：MCP 无单卡删除 action 时，把目标词卡用 `set_card_layout` 移到画布外（如 `top=2000`）即可实现该时段字幕留白：可逆、不破坏转写与源、无需用户介入。实测 `set_card_style opacity:0` 不生效（模板动画会覆盖透明度）；界面 Delete 字幕卡会连累转写/视频（用户实测发现），禁止引导用户走界面删除路径。移出后渲染验证目标词前、目标词时段、目标词后三帧：中间无字、前后原句不变、音频连续。
 
 Desktop 0.2.28+ 的 Content 面板支持直接删除单张字幕卡，删除只隐藏该时段字幕，不删除源视频或音频；但运行时仍须检查当前 Agent/MCP 的 `edit_captions` schema。若暴露单卡删除动作，读回最新 card/token 后执行并验证；若未暴露（当前接口可能只有 split/merge/set text），在完成准确分卡后暂停，明确定位目标卡，请用户在 Content 面板删除该卡，再继续总检。**禁止**用空字符串、普通空格、全角空格、零宽字符或不可见 Unicode 冒充空白，也不能用删台词来绕过接口缺口。
 
@@ -96,7 +100,8 @@ Desktop 0.2.28+ 的 Content 面板支持直接删除单张字幕卡，删除只�
 **ASR 修正（专名/同音词/水词）——优先 set_card_text 改显示，不要先动源（2026-10 实测教训）**：
 - `manage_transcript fix` 的 wordIdx 是**字级索引**（不是词级），盲猜极易偏一位，连续 fix 两次还会把源转写改乱（如把"从"改成 Codex、把"body"改成 WorkBuddy，但"扣带式""walk"残留）。
 - 更关键：**fix 改了源转写后，apply_script 会立刻报"Script row changes spoken words"**，因为 timeline.md 跟源不一致，必须重新 refreshCache + 重写 timeline + 重新 apply，一步错步步错。
-- **推荐路径**：先按源转写原样写 timeline.md 并 apply_script，让 item 先上时间线；字幕 enable 后再用 `set_card_text` 逐卡改显示文本（专名、水词、口癖）。set_card_text 只改 viewer-facing text，不动 words token 绑定，安全且不会触发 apply 校验。
+- **推荐路径**：先按源转写原样写 timeline.md 并 apply_script，让 item 先上时间线；字幕 enable 后再用 `set_card_text` 逐卡改显示文本（专名、水词、口癖）。set_card_text 只改 viewer-facing text，安全且不会触发 apply 校验。
+- **cardId 必须取自最新 `read_captions`，传错会误伤他卡（2026-10-15 第三轮实测）**：`set_card_text` 传错 cardId 时接口仍返回 success，但会把**另一张卡**的显示文本改掉，并重组该卡的 words token 绑定（实测：误把「你家业务用上了吗？」卡改成「我们举办了口袋子」，words 被合并成单个词）。批量改文本前逐卡核对 cardId 与读回文本，一次只改确认过的卡；误改后立即用正确 cardId 改回原文。
 - 只有当 ASR 错误严重到影响 item 切分边界时，才用 `manage_transcript fix`，且必须先 refreshCache、读完 library/*.md 确认 wordIdx、fix 后立刻重写 timeline.md 再 apply。
 - 命令格式：`FIX sN: wordIdx -> "newText"`（箭头两边要有空格）。改完必须读回 library/*.md 确认 wordIdx 没偏。
 
